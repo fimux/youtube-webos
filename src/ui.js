@@ -71,7 +71,8 @@ const SEGMENT_TYPES = [
   ['outro', 'Final / créditos'], ['interaction', 'Interacciones'],
   ['selfpromo', 'Autopromoción'], ['music_offtopic', 'Partes no musicales'],
   ['preview', 'Resumen / avance'], ['poi_highlight', 'Highlight'],
-  ['filler', 'Tangentes'], ['hook', 'Hook / saludos']
+  ['filler', 'Tangentes'], ['hook', 'Hook / saludos'],
+  ['exclusive_access', 'Acceso exclusivo'], ['chapter', 'Capítulos']
 ];
 const SEGMENT_COLORS = [
   '#00d400', '#00ffff', '#0202ed', '#cc00ff', '#ffff00', '#ff9900',
