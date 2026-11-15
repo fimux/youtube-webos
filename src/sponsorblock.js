@@ -1,5 +1,5 @@
 import sha256 from 'tiny-sha256';
-import { configRead, configWrite, configAddChangeListener, configRemoveChangeListener } from './config';
+import { configRead, configAddChangeListener, configRemoveChangeListener } from './config';
 import { showNotification } from './ui';
 
 const API = 'https://sponsorblock.inf.re/api';
@@ -7,7 +7,7 @@ const FALLBACK_API = 'https://sponsor.ajay.app/api';
 const HIGHLIGHT = 'poi_highlight';
 const CATEGORIES = [
   'sponsor', 'intro', 'outro', 'interaction', 'selfpromo',
-  'music_offtopic', 'preview', 'poi_highlight', 'filler', 'hook'
+  'music_offtopic', 'preview', 'poi_highlight', 'filler', 'hook', 'exclusive_access', 'chapter'
 ];
 const LEGACY_KEYS = {
   sponsor: 'enableSponsorBlockSponsor',
@@ -19,7 +19,9 @@ const LEGACY_KEYS = {
   preview: 'enableSponsorBlockPreview',
   poi_highlight: 'enableSponsorBlockHighlight',
   filler: 'enableSponsorBlockFiller',
-  hook: 'enableSponsorBlockHook'
+  hook: 'enableSponsorBlockHook',
+  exclusive_access: 'enableSponsorBlockExclusiveAccess',
+  chapter: 'enableSponsorBlockChapter'
 };
 const CATEGORY_NAMES = {
   sponsor: 'Patrocinador',
@@ -31,18 +33,16 @@ const CATEGORY_NAMES = {
   preview: 'Resumen / avance',
   poi_highlight: 'Highlight',
   filler: 'Tangentes / relleno',
-  hook: 'Hook / saludo'
+  hook: 'Hook / saludo',
+  exclusive_access: 'Acceso exclusivo (video completo)',
+  chapter: 'Capítulo'
 };
 const DEFAULT_COLORS = {
   sponsor: '#00d400', intro: '#00ffff', outro: '#0202ed',
   interaction: '#cc00ff', selfpromo: '#ffff00', music_offtopic: '#ff9900',
-  preview: '#008fd6', poi_highlight: '#ff1684', filler: '#7300ff', hook: '#395699'
+  preview: '#008fd6', poi_highlight: '#ff1684', filler: '#7300ff', hook: '#395699',
+  exclusive_access: '#a66bff', chapter: '#aaaaaa'
 };
-const COLOR_OPTIONS = [
-  '#00d400', '#00ffff', '#0202ed', '#cc00ff', '#ffff00',
-  '#ff9900', '#008fd6', '#ff1684', '#7300ff', '#395699',
-  '#ff4040', '#ffffff'
-];
 
 function getOptions() {
   return configRead('sponsorBlockOptions') || {};
@@ -60,12 +60,6 @@ function categoryOptions(category) {
   };
 }
 
-function updateCategoryOptions(category, patch) {
-  const all = Object.assign({}, getOptions());
-  all[category] = Object.assign({}, all[category] || {}, patch);
-  configWrite('sponsorBlockOptions', all);
-}
-
 function formatTime(seconds) {
   const value = Math.max(0, Math.floor(seconds || 0));
   const h = Math.floor(value / 3600);
@@ -79,12 +73,14 @@ function validSegment(raw) {
   const start = Number(raw.segment[0]);
   const end = Number(raw.segment[1]);
   if (!Number.isFinite(start) || !Number.isFinite(end) || start < 0 || end < start) return null;
-  if (start === end && raw.category !== HIGHLIGHT && raw.actionType !== 'poi') return null;
+  const isFullVideo = raw.category === 'exclusive_access' && raw.actionType === 'full';
+  if (start === end && raw.category !== HIGHLIGHT && raw.actionType !== 'poi' && !isFullVideo) return null;
   return {
     category: raw.category,
     segment: [start, end],
     actionType: typeof raw.actionType === 'string' ? raw.actionType : 'skip',
-    UUID: typeof raw.UUID === 'string' ? raw.UUID : `${raw.category}:${start}:${end}`
+    UUID: typeof raw.UUID === 'string' ? raw.UUID : `${raw.category}:${start}:${end}`,
+    description: typeof raw.description === 'string' ? raw.description : ''
   };
 }
 
@@ -97,7 +93,7 @@ function parseSegments(data, videoID) {
 async function requestSegments(videoID) {
   const hash = sha256(videoID).substring(0, 4);
   const categories = encodeURIComponent(JSON.stringify(CATEGORIES));
-  const actionTypes = encodeURIComponent(JSON.stringify(['skip', 'mute', 'poi']));
+  const actionTypes = encodeURIComponent(JSON.stringify(['skip', 'mute', 'full', 'poi', 'chapter']));
   const url = `/skipSegments/${hash}?categories=${categories}&actionTypes=${actionTypes}`;
   for (const base of [API, FALLBACK_API]) {
     try {
@@ -182,7 +178,7 @@ class SponsorBlockHandler {
 
   eligible(segment) {
     const opts = categoryOptions(segment.category);
-    return !opts.disabled && segment.actionType !== 'mute' && segment.category !== HIGHLIGHT;
+    return !opts.disabled && segment.actionType === 'skip' && segment.category !== HIGHLIGHT;
   }
 
   autoSegments() {
@@ -216,7 +212,7 @@ class SponsorBlockHandler {
   skipSegment(segment, automatic) {
     if (!this.video || !this.active) return;
     const [, end] = segment.segment;
-    if (segment.actionType === 'mute') return;
+    if (segment.actionType !== 'skip' && segment.category !== HIGHLIGHT) return;
     this.skipped.add(segment.UUID);
     const duration = this.video.duration;
     const target = Number.isFinite(duration) && duration > 0 && end >= duration - 1
@@ -295,7 +291,7 @@ class SponsorBlockHandler {
     this.overlay.textContent = '';
     this.segments.forEach((segment) => {
       const opts = categoryOptions(segment.category);
-      if (opts.disabled || !opts.showInProgress || segment.actionType === 'mute') return;
+      if (opts.disabled || !opts.showInProgress) return;
       const [start, end] = segment.segment;
       const marker = document.createElement('div');
       marker.className = 'ytaf-sponsorblock-segment';
@@ -336,21 +332,29 @@ class SponsorBlockHandler {
       swatch.style.backgroundColor = opts.color;
       const name = document.createElement('span');
       name.className = 'ytaf-sponsorblock-name';
-      name.textContent = CATEGORY_NAMES[segment.category] || segment.category;
+      name.textContent = segment.description || CATEGORY_NAMES[segment.category] || segment.category;
       const time = document.createElement('span');
       time.className = 'ytaf-sponsorblock-time';
-      time.textContent = segment.category === HIGHLIGHT
-        ? formatTime(segment.segment[0])
-        : `${formatTime(segment.segment[0])}–${formatTime(segment.segment[1])}`;
+      time.textContent = segment.actionType === 'full'
+        ? 'Video completo'
+        : segment.actionType === 'chapter'
+          ? formatTime(segment.segment[0])
+          : segment.category === HIGHLIGHT
+            ? formatTime(segment.segment[0])
+            : `${formatTime(segment.segment[0])}–${formatTime(segment.segment[1])}`;
       row.appendChild(swatch);
       row.appendChild(name);
       row.appendChild(time);
-      if (opts.manualSkip) {
+      if (opts.manualSkip && segment.actionType === 'skip' || opts.manualSkip && segment.category === HIGHLIGHT || segment.actionType === 'chapter') {
         const button = document.createElement('button');
         button.type = 'button';
         button.className = 'ytaf-sponsorblock-skip';
-        button.textContent = segment.category === HIGHLIGHT ? 'Highlight' : 'Saltar';
-        button.addEventListener('click', () => this.skipSegment(segment, false));
+        button.textContent = segment.category === HIGHLIGHT ? 'Highlight' : segment.actionType === 'chapter' ? 'Ir' : 'Saltar';
+        button.addEventListener('click', () => {
+          if (segment.category === HIGHLIGHT) this.skipSegment(segment, false);
+          else if (segment.actionType === 'chapter' && this.video) this.video.currentTime = segment.segment[0];
+          else this.skipSegment(segment, false);
+        });
         row.appendChild(button);
       }
       row.addEventListener('click', (event) => {
@@ -368,7 +372,7 @@ class SponsorBlockHandler {
     if (!this.video) return false;
     const segment = this.segments.find((item) => {
       const options = categoryOptions(item.category);
-      return item.actionType !== 'mute' && item.category !== HIGHLIGHT &&
+      return item.actionType === 'skip' && item.category !== HIGHLIGHT &&
         !options.disabled && options.manualSkip && item.segment[1] > this.video.currentTime + 0.1;
     });
     if (!segment) {
