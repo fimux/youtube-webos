@@ -190,7 +190,8 @@
   z-index: 1100;
   right: 2%;
   top: 18%;
-  width: min(35rem, 42vw);
+  width: 42vw;
+  max-width: 35rem;
   max-height: 65vh;
   overflow: auto;
   padding: .8rem;
