@@ -2,9 +2,15 @@ import { configRead, configAddChangeListener } from './config';
 
 const API = 'https://returnyoutubedislikeapi.com/votes?videoId=';
 const TARGETS = [
+  'ytlr-watch-metadata-renderer',
   'ytlr-watch-metadata',
+  'ytlr-watch-description-renderer',
+  'ytlr-watch-description',
+  'ytlr-video-description-renderer',
   'ytlr-video-description',
   '[idomkey="video-info"]',
+  '[idomkey="video-description"]',
+  '[idomkey="description-panel"]',
   '[idomkey="description"]',
   '.ytlr-watch-metadata',
   '.ytlr-video-description'
