@@ -21,13 +21,15 @@
 ## Features
 
 - Ad Blocking
+- Schema-aware ad filtering for browse, search, Shorts and playback overlays
 - [SponsorBlock](https://sponsor.ajay.app/) Integration
+- SponsorBlock segment list, per-category skip modes and colors
 - [Autostart Support](#autostart)
 - Force Highest Video Quality
 - Audio-Only Mode (🟦 Blue button on remote)
 - Full Animation Support
 - Shorts Removal
-- Higher-Quality Thumbnails
+- Higher-Quality Thumbnails (optional fast URL rewriting)
 - On-Screen Clock Overlay
 - YouTube Logo Removal
 - Remove end screens
@@ -35,6 +37,8 @@
 
 > [!NOTE]
 > Press the 🟩 **Green** button on your remote to access the configuration screen.
+> The 🟦 **Blue** button jumps to the next SponsorBlock Highlight when available;
+> otherwise, it toggles Audio-Only mode.
 
 ---
 
