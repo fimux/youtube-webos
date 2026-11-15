@@ -1,3 +1,5 @@
+import { configRead, configAddChangeListener } from './config';
+
 const webpTestImgs = {
   lossy: 'UklGRiIAAABXRUJQVlA4IBYAAAAwAQCdASoBAAEADsD+JaQAA3AAAAAA',
   lossless: 'UklGRhoAAABXRUJQVlA4TA0AAAAvAAAAEAcQERGIiP4HAA==',
@@ -74,7 +76,139 @@ function parseCSSUrl(value: string): URL | undefined {
   }
 }
 
-async function upgradeBgImg(element: HTMLElement) {
+let thumbnailObserverActive = false;
+let observedThumbnails = new WeakSet<HTMLElement>();
+const previousStyle = document.createElement('div');
+
+function isThumbnailRoute() {
+  const route = new URL(location.hash.substring(1), location.href).pathname;
+  return (
+    route === '/' ||
+    route === '/home' ||
+    route === '/watch' ||
+    route === '/results' ||
+    route === '/feed/subscriptions' ||
+    route.startsWith('/browse')
+  );
+}
+
+function handleThumbnailStyleChange(
+  element: HTMLElement,
+  oldValue?: string | null
+) {
+  if (!thumbnailObserverActive || !element.isConnected) return;
+
+  previousStyle.style.cssText = oldValue ?? '';
+  if (
+    previousStyle.style.backgroundImage === element.style.backgroundImage ||
+    element.style.backgroundImage === ''
+  ) {
+    return;
+  }
+  upgradeBgImg(element);
+}
+
+function observeThumbnail(element: HTMLElement) {
+  if (
+    !thumbnailObserverActive ||
+    !element.matches('ytlr-thumbnail-details') ||
+    observedThumbnails.has(element)
+  ) {
+    return;
+  }
+
+  observedThumbnails.add(element);
+  obs.observe(element, {
+    attributes: true,
+    attributeFilter: ['style'],
+    attributeOldValue: true
+  });
+  upgradeBgImg(element);
+}
+
+function inspectAddedNode(node: Node) {
+  if (!(node instanceof HTMLElement)) return;
+  observeThumbnail(node);
+
+  const thumbnails = node.getElementsByTagName('ytlr-thumbnail-details');
+  for (let index = 0; index < thumbnails.length; index++) {
+    observeThumbnail(thumbnails[index] as HTMLElement);
+  }
+}
+
+const obs = new MutationObserver((mutations) => {
+  for (const mutation of mutations) {
+    if (mutation.type === 'attributes') {
+      handleThumbnailStyleChange(
+        mutation.target as HTMLElement,
+        mutation.oldValue
+      );
+    } else {
+      for (const node of mutation.addedNodes) {
+        inspectAddedNode(node);
+      }
+    }
+  }
+});
+
+function disableObserver() {
+  thumbnailObserverActive = false;
+  obs.disconnect();
+  observedThumbnails = new WeakSet<HTMLElement>();
+}
+
+function enableObserver() {
+  disableObserver();
+  if (
+    !configRead('upgradeThumbnails') ||
+    configRead('fastThumbnailUpgrade') ||
+    !isThumbnailRoute()
+  ) {
+    return;
+  }
+
+  thumbnailObserverActive = true;
+  const root =
+    document.querySelector<HTMLElement>('[idomkey="page-manager"]') ||
+    document.body;
+  obs.observe(root, { subtree: true, childList: true });
+
+  const thumbnails = root.getElementsByTagName('ytlr-thumbnail-details');
+  for (let index = 0; index < thumbnails.length; index++) {
+    observeThumbnail(thumbnails[index] as HTMLElement);
+  }
+}
+
+function handleThumbnailRouteChange() {
+  if (!configRead('upgradeThumbnails') || !isThumbnailRoute()) {
+    disableObserver();
+    return;
+  }
+
+  if (configRead('fastThumbnailUpgrade')) {
+    disableObserver();
+    const root =
+      document.querySelector<HTMLElement>('[idomkey="page-manager"]') ||
+      document.body;
+    const thumbnails = root.getElementsByTagName('ytlr-thumbnail-details');
+    for (let index = 0; index < thumbnails.length; index++) {
+      upgradeBgImg(thumbnails[index] as HTMLElement);
+    }
+    return;
+  }
+
+  enableObserver();
+}
+
+function shouldUpgradeThumbnail() {
+  return (
+    configRead('upgradeThumbnails') &&
+    (thumbnailObserverActive || configRead('fastThumbnailUpgrade'))
+  );
+}
+
+function upgradeBgImg(element: HTMLElement) {
+  if (!shouldUpgradeThumbnail()) return;
   const style = element.style;
   const old = parseCSSUrl(style.backgroundImage);
   if (!old) return;
@@ -85,6 +219,7 @@ async function upgradeBgImg(element: HTMLElement) {
   const lazyLoader = new Image();
 
   lazyLoader.onload = () => {
+    if (!shouldUpgradeThumbnail() || !element.isConnected) return;
     // Don't swap if a placeholder thumbnail was provided.
     // Placeholder thumbnails are the same size as the "default" size.
     if (lazyLoader.naturalHeight === 90) return;
@@ -101,56 +236,9 @@ async function upgradeBgImg(element: HTMLElement) {
   lazyLoader.src = target.href;
 }
 
-const obs = new MutationObserver((mutations) => {
-  const YT_THUMBNAIL_ELEMENT_TAG = 'ytlr-thumbnail-details';
+handleThumbnailRouteChange();
 
-  const dummy = document.createElement('div');
-
-  // handle backgroundImage change
-  // YT re-uses thumbnail elements in its virtual list implementation.
-  mutations
-    .filter((mut) => mut.type === 'attributes')
-    .map((mut) => [mut.target, mut] as const)
-    .filter((value): value is [HTMLElement, MutationRecord] => {
-      const [node, { oldValue }] = value;
-      dummy.style.cssText = oldValue ?? '';
-
-      return (
-        node instanceof HTMLElement &&
-        node.matches(YT_THUMBNAIL_ELEMENT_TAG) &&
-        node.style.backgroundImage !== '' &&
-        node.style.backgroundImage !== dummy.style.backgroundImage
-      );
-    })
-    .map(([elem]) => elem)
-    .forEach(upgradeBgImg);
-
-  // handle element add
-  mutations
-    .filter((mut) => mut.type === 'childList')
-    .flatMap((mut) => Array.from(mut.addedNodes))
-    .filter((node) => node instanceof HTMLElement)
-    .flatMap((elem) =>
-      Array.from(elem.querySelectorAll<HTMLElement>(YT_THUMBNAIL_ELEMENT_TAG))
-    )
-    .filter((elem) => elem.style.backgroundImage !== '')
-    .forEach(upgradeBgImg);
-});
-
-function enableObserver() {
-  obs.observe(document.body, {
-    subtree: true,
-    childList: true,
-    attributes: true,
-    attributeFilter: ['style'],
-    attributeOldValue: true
-  });
-}
-
-import { configRead, configAddChangeListener } from './config';
-
-if (configRead('upgradeThumbnails')) enableObserver();
-
-configAddChangeListener('upgradeThumbnails', (value) =>
-  value ? enableObserver() : obs.disconnect()
-);
+configAddChangeListener('upgradeThumbnails', handleThumbnailRouteChange);
+configAddChangeListener('fastThumbnailUpgrade', handleThumbnailRouteChange);
+window.addEventListener('hashchange', handleThumbnailRouteChange);
+window.addEventListener('yt-navigate-finish', handleThumbnailRouteChange);
