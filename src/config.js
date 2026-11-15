@@ -7,10 +7,12 @@ const sponsorBlockOptions = {
   interaction: { autoSkip: true, manualSkip: true, showInProgress: true, disabled: false, color: '#cc00ff' },
   selfpromo: { autoSkip: true, manualSkip: true, showInProgress: true, disabled: false, color: '#ffff00' },
   music_offtopic: { autoSkip: true, manualSkip: true, showInProgress: true, disabled: false, color: '#ff9900' },
-  preview: { autoSkip: true, manualSkip: true, showInProgress: true, disabled: false, color: '#008fd6' },
+  preview: { autoSkip: false, manualSkip: true, showInProgress: true, disabled: false, color: '#008fd6' },
   poi_highlight: { autoSkip: false, manualSkip: true, showInProgress: true, disabled: false, color: '#ff1684' },
   filler: { autoSkip: false, manualSkip: true, showInProgress: true, disabled: false, color: '#7300ff' },
-  hook: { autoSkip: false, manualSkip: true, showInProgress: true, disabled: false, color: '#395699' }
+  hook: { autoSkip: false, manualSkip: true, showInProgress: true, disabled: false, color: '#395699' },
+  exclusive_access: { autoSkip: false, manualSkip: false, showInProgress: true, disabled: false, color: '#a66bff' },
+  chapter: { autoSkip: false, manualSkip: true, showInProgress: true, disabled: false, color: '#aaaaaa' }
 };
 
 const numberKeyActions = {
@@ -47,6 +49,8 @@ const configOptions = new Map([
   ['enableSponsorBlockHook', { default: false, desc: 'Enable hook/greetings segments' }],
   ['enableSponsorBlockFiller', { default: false, desc: 'Enable filler/tangents segments' }],
   ['enableSponsorBlockHighlight', { default: true, desc: 'Enable SponsorBlock highlights' }],
+  ['enableSponsorBlockExclusiveAccess', { default: true, desc: 'Show full-video exclusive access segments' }],
+  ['enableSponsorBlockChapter', { default: true, desc: 'Show SponsorBlock chapter markers' }],
   ['enableMutedSegments', { default: true, desc: 'Mute SponsorBlock muted segments' }],
   ['skipSegmentsOnce', { default: false, desc: 'Skip each segment only once per playback session' }],
   ['sponsorBlockOptions', { default: sponsorBlockOptions, desc: 'Per-category SponsorBlock settings' }],
