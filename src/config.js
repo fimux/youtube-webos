@@ -1,8 +1,103 @@
 const CONFIG_KEY = 'ytaf-configuration';
 
+export const sponsorBlockCategories = [
+  {
+    id: 'sponsor',
+    name: 'Sponsor',
+    color: '#00d400',
+    mode: 'auto',
+    legacyKey: 'enableSponsorBlockSponsor'
+  },
+  {
+    id: 'intro',
+    name: 'Intro',
+    color: '#00ffff',
+    mode: 'auto',
+    legacyKey: 'enableSponsorBlockIntro'
+  },
+  {
+    id: 'outro',
+    name: 'Outro',
+    color: '#0202ed',
+    mode: 'auto',
+    legacyKey: 'enableSponsorBlockOutro'
+  },
+  {
+    id: 'interaction',
+    name: 'Interaction reminder',
+    color: '#cc00ff',
+    mode: 'auto',
+    legacyKey: 'enableSponsorBlockInteraction'
+  },
+  {
+    id: 'selfpromo',
+    name: 'Self-promotion',
+    color: '#ffff00',
+    mode: 'auto',
+    legacyKey: 'enableSponsorBlockSelfPromo'
+  },
+  {
+    id: 'music_offtopic',
+    name: 'Non-music part',
+    color: '#ff9900',
+    mode: 'auto',
+    legacyKey: 'enableSponsorBlockMusicOfftopic'
+  },
+  {
+    id: 'preview',
+    name: 'Recap or preview',
+    color: '#008fd6',
+    mode: 'disabled',
+    legacyKey: 'enableSponsorBlockPreview'
+  },
+  {
+    id: 'filler',
+    name: 'Filler',
+    color: '#7300ff',
+    mode: 'manual'
+  },
+  {
+    id: 'poi_highlight',
+    name: 'Highlight',
+    color: '#ffff00',
+    mode: 'manual'
+  },
+  {
+    id: 'exclusive_access',
+    name: 'Exclusive access',
+    color: '#008a5c',
+    mode: 'manual'
+  },
+  {
+    id: 'hook',
+    name: 'Hook',
+    color: '#ff6b6b',
+    mode: 'manual'
+  },
+  {
+    id: 'tangent',
+    name: 'Tangents',
+    color: '#b565d9',
+    mode: 'manual'
+  },
+  {
+    id: 'mute',
+    name: 'Muted segments',
+    color: '#777777',
+    mode: 'auto'
+  }
+];
+
 const configOptions = new Map([
   ['enableAdBlock', { default: true, desc: 'Enable ad blocking' }],
   ['upgradeThumbnails', { default: false, desc: 'Upgrade thumbnail quality' }],
+  [
+    'fastThumbnailUpgrade',
+    {
+      default: false,
+      desc: 'Use fast upgrades with higher-quality thumbnails'
+    }
+  ],
   [
     'removeShorts',
     { default: false, desc: 'Remove Shorts from subscriptions' }
@@ -43,6 +138,10 @@ const configOptions = new Map([
     }
   ],
   [
+    'sponsorBlockSkipSegmentsOnce',
+    { default: false, desc: 'Skip each segment only once per video' }
+  ],
+  [
     'hideLogo',
     {
       default: false,
@@ -78,6 +177,22 @@ const configOptions = new Map([
     }
   ]
 ]);
+
+for (const category of sponsorBlockCategories) {
+  const prefix = `sponsorBlock_${category.id}`;
+  configOptions.set(`${prefix}_mode`, {
+    default: category.mode,
+    desc: `${category.name} segment behavior`
+  });
+  configOptions.set(`${prefix}_color`, {
+    default: category.color,
+    desc: `${category.name} segment color`
+  });
+  configOptions.set(`${prefix}_show`, {
+    default: true,
+    desc: `Show ${category.name} in progress bar`
+  });
+}
 
 const defaultConfig = (() => {
   let ret = {};
@@ -133,6 +248,17 @@ export function configRead(key) {
   }
 
   if (localConfig[key] === undefined) {
+    const category = sponsorBlockCategories.find(
+      (item) => item.legacyKey && key === `sponsorBlock_${item.id}_mode`
+    );
+    if (
+      category?.legacyKey &&
+      Object.prototype.hasOwnProperty.call(localConfig, category.legacyKey)
+    ) {
+      localConfig[key] = localConfig[category.legacyKey] ? 'auto' : 'disabled';
+      return localConfig[key];
+    }
+
     console.warn(
       'Populating key',
       key,
