@@ -1,5 +1,5 @@
 import sha256 from 'tiny-sha256';
-import { configRead, configWrite, configAddChangeListener } from './config';
+import { configRead, configWrite, configAddChangeListener, configRemoveChangeListener } from './config';
 import { showNotification } from './ui';
 
 const API = 'https://sponsorblock.inf.re/api';
@@ -154,7 +154,9 @@ class SponsorBlockHandler {
     configAddChangeListener('sponsorBlockOptions', update);
     configAddChangeListener('skipSegmentsOnce', update);
     configAddChangeListener('enableMutedSegments', update);
-    this.listeners.push(() => configAddChangeListener('sponsorBlockOptions', update));
+    this.listeners.push(() => configRemoveChangeListener('sponsorBlockOptions', update));
+    this.listeners.push(() => configRemoveChangeListener('skipSegmentsOnce', update));
+    this.listeners.push(() => configRemoveChangeListener('enableMutedSegments', update));
   }
 
   attachVideo() {
@@ -362,6 +364,21 @@ class SponsorBlockHandler {
     this.renderProgressMarkers();
   }
 
+  skipNextManual() {
+    if (!this.video) return false;
+    const segment = this.segments.find((item) => {
+      const options = categoryOptions(item.category);
+      return item.actionType !== 'mute' && item.category !== HIGHLIGHT &&
+        !options.disabled && options.manualSkip && item.segment[1] > this.video.currentTime + 0.1;
+    });
+    if (!segment) {
+      showNotification('No hay segmentos manuales disponibles', 1800);
+      return false;
+    }
+    this.skipSegment(segment, false);
+    return true;
+  }
+
   nextHighlight() {
     if (!this.video) return false;
     const now = this.video.currentTime + 0.5;
@@ -440,3 +457,6 @@ export function toggleSponsorBlockList() {
   if (!panel) return;
   panel.classList.toggle('collapsed');
 }
+
+window.ytaf_jumpToNextHighlight = jumpToNextHighlight;
+window.ytaf_toggleSponsorBlockList = toggleSponsorBlockList;
