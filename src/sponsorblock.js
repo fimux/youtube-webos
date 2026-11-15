@@ -195,7 +195,10 @@ class SponsorBlockHandler {
     const video = this.video;
     if (!this.active || !video || video.paused) return;
     const now = video.currentTime;
-    const fullVideo = this.autoSegments().find((segment) => segment.actionType === 'full');
+    const fullVideo = this.autoSegments().find((segment) =>
+      segment.actionType === 'full' && segment.category === 'exclusive_access' &&
+      (!configRead('skipSegmentsOnce') || !this.skipped.has(segment.UUID))
+    );
     if (fullVideo && Number.isFinite(video.duration) && video.duration > 0 &&
         video.currentTime < video.duration - 0.5) {
       this.skipSegment(fullVideo, true);
