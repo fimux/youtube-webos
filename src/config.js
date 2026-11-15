@@ -118,7 +118,27 @@ function loadStoredConfig() {
   }
 
   try {
-    return JSON.parse(storage);
+    const stored = JSON.parse(storage);
+    if (!stored.sponsorBlockOptions) {
+      stored.sponsorBlockOptions = JSON.parse(JSON.stringify(sponsorBlockOptions));
+      for (const [category, key] of Object.entries({
+        sponsor: 'enableSponsorBlockSponsor',
+        intro: 'enableSponsorBlockIntro',
+        outro: 'enableSponsorBlockOutro',
+        interaction: 'enableSponsorBlockInteraction',
+        selfpromo: 'enableSponsorBlockSelfPromo',
+        music_offtopic: 'enableSponsorBlockMusicOfftopic',
+        preview: 'enableSponsorBlockPreview'
+      })) {
+        if (typeof stored[key] === 'boolean') {
+          stored.sponsorBlockOptions[category].autoSkip = stored[key];
+        }
+      }
+    }
+    if (!stored.numberKeyActions) {
+      stored.numberKeyActions = Object.assign({}, numberKeyActions);
+    }
+    return stored;
   } catch (err) {
     console.warn('Error parsing stored config:', err);
     return null;
