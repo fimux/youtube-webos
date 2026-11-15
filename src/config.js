@@ -144,7 +144,6 @@ function loadStoredConfig() {
       selfpromo: 'enableSponsorBlockSelfPromo',
       music_offtopic: 'enableSponsorBlockMusicOfftopic',
       preview: 'enableSponsorBlockPreview',
-      poi_highlight: 'enableSponsorBlockHighlight',
       filler: 'enableSponsorBlockFiller',
       hook: 'enableSponsorBlockHook',
       exclusive_access: 'enableSponsorBlockExclusiveAccess',
