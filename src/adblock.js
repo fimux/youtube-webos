@@ -43,11 +43,7 @@ const AD_RENDERERS = new Set([
   'paidContentOverlay'
 ]);
 
-const AD_MARKERS = [
-  ...AD_RENDERERS,
-  'shelfRenderer',
-  'playerResponse'
-];
+const AD_MARKERS = [...AD_RENDERERS];
 
 const HOME_SECTION_PATH = [
   'contents', 'tvBrowseRenderer', 'content',
