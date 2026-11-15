@@ -96,13 +96,17 @@ async function requestSegments(videoID) {
   const actionTypes = encodeURIComponent(JSON.stringify(['skip', 'mute', 'full', 'poi', 'chapter']));
   const url = `/skipSegments/${hash}?categories=${categories}&actionTypes=${actionTypes}`;
   for (const base of [API, FALLBACK_API]) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 6500);
     try {
-      const response = await fetch(base + url);
+      const response = await fetch(base + url, { signal: controller.signal });
       if (response.status === 404) return [];
       if (!response.ok) continue;
       return await response.json();
     } catch (error) {
       console.warn('[SponsorBlock] API request failed', error);
+    } finally {
+      clearTimeout(timeout);
     }
   }
   return null;
@@ -178,7 +182,7 @@ class SponsorBlockHandler {
 
   eligible(segment) {
     const opts = categoryOptions(segment.category);
-    return !opts.disabled && segment.actionType === 'skip' && segment.category !== HIGHLIGHT;
+    return !opts.disabled && (segment.actionType === 'skip' || segment.actionType === 'full') && segment.category !== HIGHLIGHT;
   }
 
   autoSegments() {
@@ -191,6 +195,12 @@ class SponsorBlockHandler {
     const video = this.video;
     if (!this.active || !video || video.paused) return;
     const now = video.currentTime;
+    const fullVideo = this.autoSegments().find((segment) => segment.actionType === 'full');
+    if (fullVideo && Number.isFinite(video.duration) && video.duration > 0 &&
+        video.currentTime < video.duration - 0.5) {
+      this.skipSegment(fullVideo, true);
+      return;
+    }
     const next = this.autoSegments().find((segment) => {
       if (configRead('skipSegmentsOnce') && this.skipped.has(segment.UUID)) return false;
       return segment.segment[1] > now + 0.05;
@@ -212,12 +222,14 @@ class SponsorBlockHandler {
   skipSegment(segment, automatic) {
     if (!this.video || !this.active) return;
     const [, end] = segment.segment;
-    if (segment.actionType !== 'skip' && segment.category !== HIGHLIGHT) return;
+    if (segment.actionType !== 'skip' && segment.actionType !== 'full' && segment.category !== HIGHLIGHT) return;
     this.skipped.add(segment.UUID);
     const duration = this.video.duration;
-    const target = Number.isFinite(duration) && duration > 0 && end >= duration - 1
+    const target = segment.actionType === 'full' && Number.isFinite(duration) && duration > 0
       ? Math.max(0, duration - 0.25)
-      : Math.min(end, duration || end);
+      : Number.isFinite(duration) && duration > 0 && end >= duration - 1
+        ? Math.max(0, duration - 0.25)
+        : Math.min(end, duration || end);
     if (segment.category === HIGHLIGHT) {
       this.video.currentTime = segment.segment[0];
     } else {
@@ -345,13 +357,13 @@ class SponsorBlockHandler {
       row.appendChild(swatch);
       row.appendChild(name);
       row.appendChild(time);
-      if (opts.manualSkip && (segment.actionType === 'skip' || segment.category === HIGHLIGHT || segment.actionType === 'chapter')) {
+      if (opts.manualSkip && (segment.actionType === 'skip' || segment.actionType === 'full' || segment.category === HIGHLIGHT || segment.actionType === 'chapter')) {
         const button = document.createElement('button');
         button.type = 'button';
         button.className = 'ytaf-sponsorblock-skip';
         const alreadySkipped = configRead('skipSegmentsOnce') && this.skipped.has(segment.UUID);
         button.disabled = alreadySkipped;
-        button.textContent = alreadySkipped ? 'Saltado' : segment.category === HIGHLIGHT ? 'Highlight' : segment.actionType === 'chapter' ? 'Ir' : 'Saltar';
+        button.textContent = alreadySkipped ? 'Saltado' : segment.actionType === 'full' ? 'Omitir video' : segment.category === HIGHLIGHT ? 'Highlight' : segment.actionType === 'chapter' ? 'Ir' : 'Saltar';
         button.addEventListener('click', () => {
           if (segment.category === HIGHLIGHT) this.skipSegment(segment, false);
           else if (segment.actionType === 'chapter' && this.video) this.video.currentTime = segment.segment[0];
@@ -374,7 +386,7 @@ class SponsorBlockHandler {
     if (!this.video) return false;
     const segment = this.segments.find((item) => {
       const options = categoryOptions(item.category);
-      return item.actionType === 'skip' && item.category !== HIGHLIGHT &&
+      return (item.actionType === 'skip' || item.actionType === 'full') && item.category !== HIGHLIGHT &&
         !options.disabled && options.manualSkip && item.segment[1] > this.video.currentTime + 0.1 &&
         (!configRead('skipSegmentsOnce') || !this.skipped.has(item.UUID));
     });
