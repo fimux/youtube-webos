@@ -13,6 +13,7 @@
   padding: 1em;
   font-size: 1.4rem;
   z-index: 1000;
+  overflow-y: auto;
 }
 
 .ytaf-ui-container :focus {
@@ -34,6 +35,89 @@
 .ytaf-ui-container label {
   display: block;
   font-size: 1.3rem;
+}
+
+.ytaf-sponsorblock-settings {
+  margin-top: 1em;
+}
+
+.ytaf-sponsorblock-settings h2 {
+  margin: 0.8em 0 0.35em;
+  font-size: 1.1em;
+}
+
+.ytaf-sponsorblock-settings > label {
+  margin-bottom: 0.5em;
+}
+
+.ytaf-sponsorblock-category,
+.ytaf-sponsorblock-segment-row {
+  display: grid;
+  grid-template-columns: minmax(12rem, 1fr) minmax(9rem, auto) 3rem 3rem;
+  gap: 0.5em;
+  align-items: center;
+  padding: 0.25em 0;
+  font-size: 0.85em;
+}
+
+.ytaf-sponsorblock-category select,
+.ytaf-sponsorblock-segment-row button {
+  font: inherit;
+}
+
+.ytaf-sponsorblock-category input[type='color'] {
+  width: 2.5rem;
+  height: 2rem;
+  padding: 0;
+}
+
+.ytaf-sponsorblock-category input[type='checkbox'] {
+  width: 1.5rem;
+  height: 1.5rem;
+  justify-self: center;
+}
+
+.ytaf-sponsorblock-show {
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25em;
+  font-size: 0.7em !important;
+}
+
+.ytaf-sponsorblock-segment-list {
+  max-height: 12rem;
+  overflow-y: auto;
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.ytaf-sponsorblock-segment-row {
+  grid-template-columns: 0.7rem 1fr auto;
+}
+
+.ytaf-sponsorblock-list-color {
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 50%;
+}
+
+.ytaf-sponsorblock-segment-list p {
+  font-size: 0.8em;
+}
+
+.ytaf-sponsorblock-manual-skip {
+  display: none;
+  position: fixed;
+  left: 50%;
+  bottom: 12%;
+  transform: translateX(-50%);
+  z-index: 1200;
+  padding: 0.8em 1.2em;
+  border: 0;
+  border-radius: 8px;
+  background: #e62117;
+  color: white;
+  font-size: 1.2rem;
 }
 
 .ytaf-notification-container {
