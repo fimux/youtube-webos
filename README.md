@@ -32,6 +32,19 @@
 - YouTube Logo Removal
 - Remove end screens
 - Bypass account selector screen
+- Optional Return YouTube Dislike estimate in video details
+- Hide QR-code overlays and the Shop button during playback
+- Schema-aware filtering of known ad renderers across supported YouTube response types
+
+### Advanced SponsorBlock & Remote Controls
+
+- SponsorBlock types: sponsors, intros, outros, interactions, self-promotion, non-music sections, previews, highlights, tangents/filler, hooks, exclusive-access markers, and chapters.
+- Per-category controls for automatic skipping, manual skipping, progress-bar markers, disabling, and marker colors.
+- On-screen segment list with timestamps and manual jump/skip actions.
+- The **BLUE** remote button jumps to the next Highlight by default; it can be reassigned to Audio-Only or the segment list.
+- **Skip Segments Once** prevents the same segment from being automatically skipped more than once in a playback session.
+- Programmable number keys (0–9): seek ±10 seconds, play/pause, jump to Highlight, show the segment list, skip the next manual segment, or restart.
+- The JSON ad filter checks for known renderer keys before walking the parsed object, with a node limit to bound work on TV hardware. Shorts filtering also checks for Shorts-specific markers before traversing a response.
 
 > [!NOTE]
 > Press the 🟩 **Green** button on your remote to access the configuration screen.
