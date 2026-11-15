@@ -12,7 +12,6 @@ const TARGETS = [
 
 let currentVideoID = null;
 let currentCount = null;
-let observer = null;
 let requestToken = 0;
 
 function findDescriptionTarget() {
@@ -61,10 +60,18 @@ async function load(videoID) {
   render();
   if (!videoID || !configRead('enableReturnYouTubeDislike')) return;
   try {
-    const response = await fetch(API + encodeURIComponent(videoID), {
-      method: 'GET',
-      headers: { Accept: 'application/json' }
-    });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 6500);
+    let response;
+    try {
+      response = await fetch(API + encodeURIComponent(videoID), {
+        method: 'GET',
+        headers: { Accept: 'application/json' },
+        signal: controller.signal
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
     if (!response.ok) throw new Error('RYD API status ' + response.status);
     const data = await response.json();
     if (token !== requestToken || currentVideoID !== videoID) return;
@@ -101,6 +108,6 @@ configAddChangeListener('enableReturnYouTubeDislike', () => {
 });
 
 window.addEventListener('hashchange', syncRoute, false);
-observer = new MutationObserver(() => render());
+const observer = new MutationObserver(() => render());
 observer.observe(document.documentElement, { childList: true, subtree: true });
 syncRoute();
