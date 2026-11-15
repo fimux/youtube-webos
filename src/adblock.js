@@ -2,89 +2,214 @@
 /* global fetch:writable */
 import { configRead } from './config';
 
-/**
- * This is a minimal reimplementation of the following uBlock Origin rule:
- * https://github.com/uBlockOrigin/uAssets/blob/master/filters/filters.txt
- */
-const origParse = JSON.parse;
+const originalParse = JSON.parse;
+const contentKeys = new Set([
+  'contents',
+  'content',
+  'primaryContents',
+  'secondaryContents',
+  'tabs',
+  'tabRenderer',
+  'continuationContents',
+  'onResponseReceivedActions',
+  'onResponseReceivedEndpoints',
+  'playerResponse',
+  'playerOverlays',
+  'playerOverlayRenderer',
+  'decoratedPlayerBarRenderer',
+  'videoWithContextRenderer',
+  'tvBrowseRenderer',
+  'tvSurfaceContentRenderer',
+  'twoColumnSearchResultsRenderer',
+  'twoColumnBrowseResultsRenderer',
+  'sectionListRenderer',
+  'gridRenderer',
+  'gridContinuation',
+  'richGridRenderer',
+  'richGridContinuation',
+  'horizontalListRenderer',
+  'itemSectionRenderer',
+  'shelfRenderer',
+  'richItemRenderer'
+]);
+const thumbnailTraversalKeys = new Set([
+  ...traversalKeys,
+  'items',
+  'thumbnail',
+  'videoRenderer',
+  'compactVideoRenderer',
+  'gridVideoRenderer',
+  'playlistVideoRenderer',
+  'reelItemRenderer',
+  'tileRenderer',
+  'richThumbnail',
+  'channelThumbnail',
+  'avatar'
+]);
+const removableAdRenderers = new Set([
+  'adSlotRenderer',
+  'displayAdRenderer',
+  'inFeedAdLayoutRenderer',
+  'promotedVideoRenderer',
+  'promotedSparklesWebRenderer'
+]);
+const removablePlayerOverlayRenderers = new Set([
+  'adOverlayRenderer',
+  'promotedSparklesWebRenderer',
+  'qrCodeRenderer',
+  'shopButtonRenderer',
+  'shoppingOverlayRenderer'
+]);
+const traversalKeys = new Set([
+  ...contentKeys,
+  'playerOverlays',
+  'playerOverlayRenderer',
+  'decoratedPlayerBarRenderer',
+  'videoWithContextRenderer'
+]);
+const playerOverlayTraversalKeys = new Set([
+  'playerOverlays',
+  'playerOverlayRenderer',
+  'decoratedPlayerBarRenderer',
+  'videoWithContextRenderer'
+]);
+const adFields = ['playerAds', 'adPlacements', 'adSlots'];
+
 JSON.parse = function () {
-  /** @type {unknown} */
-  const r = origParse.apply(this, arguments);
-
-  // TODO: add below to a dump-level logger
-  // if (
-  //   !(Object.keys(r).length === 1 && 'data' in r && typeof r.data === 'boolean')
-  // ) {
-  //   console.debug('JSON.parse', r);
-  // }
-
-  if (!configRead('enableAdBlock')) {
-    return r;
+  const response = originalParse.apply(this, arguments);
+  if (!isObject(response) || !hasAdSchema(response)) {
+    return response;
   }
 
-  if (r?.adPlacements) {
-    delete r.adPlacements;
-    console.info('[adblock] Removed adPlacements');
+  const shouldBlockAds = configRead('enableAdBlock');
+  const shouldUpgradeThumbnails =
+    configRead('upgradeThumbnails') && configRead('fastThumbnailUpgrade');
+  if (!shouldBlockAds && !shouldUpgradeThumbnails) {
+    return response;
   }
 
-  if (Array.isArray(r?.adSlots)) {
-    delete r.adSlots;
-    console.info('[adblock] Removed adSlots');
-  }
-
-  if (r?.playerAds) {
-    delete r.playerAds;
-    console.info('[adblock] Removed playerAds');
-  }
-
-  // remove ads from home
-  const homeSectionListRenderer =
-    r?.contents?.tvBrowseRenderer?.content?.tvSurfaceContentRenderer?.content
-      ?.sectionListRenderer;
-  if (homeSectionListRenderer?.contents) {
-    // Drop the full width ad card, usually appears at the top of the page
-    homeSectionListRenderer.contents = homeSectionListRenderer.contents.filter(
-      (elm) => !elm.tvMastheadRenderer
-    );
-
-    // Drop ad tile from the horizontal shelf
-    removeAdSlotRenderer(homeSectionListRenderer);
-  }
-
-  // remove ad tile from search
-  const searchSectionListRenderer = r?.contents?.sectionListRenderer;
-  if (searchSectionListRenderer?.contents) {
-    removeAdSlotRenderer(searchSectionListRenderer);
-  }
-
-  if (Array.isArray(r?.entries)) {
-    r.entries = r.entries.filter(
-      (elm) => !elm?.command?.reelWatchEndpoint?.adClientParams?.isAd
-    );
-  }
-
-  return r;
+  visitContent(response, response, shouldBlockAds, shouldUpgradeThumbnails);
+  return response;
 };
 
-// Drop `adSlotRenderer`
-// `adSlotRenderer` can occur as,
-// - sectionListRenderer.contents[*].adSlotRenderer
-// - sectionListRenderer.contents[*].shelfRenderer.content.horizontalListRenderer.items[*].adSlotRenderer
-function removeAdSlotRenderer(sectionListRenderer) {
-  // sectionListRenderer.contents[*].adSlotRenderer
-  sectionListRenderer.contents = sectionListRenderer.contents.filter(
-    (elm) => !elm.adSlotRenderer
-  );
+function isObject(value) {
+  return value !== null && typeof value === 'object';
+}
 
-  // sectionListRenderer.contents[*].shelfRenderer.content.horizontalListRenderer.items[*].adSlotRenderer
-  const contentsWithShelfRenderer = sectionListRenderer.contents.filter(
-    (elm) => elm.shelfRenderer
+function hasAdSchema(response) {
+  return (
+    'playerAds' in response ||
+    'adPlacements' in response ||
+    'adSlots' in response ||
+    'playerResponse' in response ||
+    'gridRenderer' in response ||
+    'gridContinuation' in response ||
+    'sectionListRenderer' in response ||
+    (Array.isArray(response.entries) &&
+      response.entries.some((entry) => isAdEntry(entry))) ||
+    Boolean(
+      response.contents?.tvBrowseRenderer ||
+        response.contents?.twoColumnSearchResultsRenderer ||
+        response.contents?.twoColumnBrowseResultsRenderer ||
+        response.contents?.sectionListRenderer ||
+        response.contents?.gridRenderer ||
+        response.continuationContents?.gridContinuation
+    )
   );
-  contentsWithShelfRenderer.forEach((content) => {
-    const horizontalRenderer =
-      content.shelfRenderer.content.horizontalListRenderer;
-    horizontalRenderer.items = horizontalRenderer.items.filter(
-      (elm) => !elm.adSlotRenderer
-    );
-  });
+}
+
+function visitContent(
+  node,
+  root,
+  shouldBlockAds,
+  shouldUpgradeThumbnails,
+  isPlayerResponse = false
+) {
+  if (Array.isArray(node)) {
+    for (const item of node) {
+      visitContent(
+        item,
+        root,
+        shouldBlockAds,
+        shouldUpgradeThumbnails,
+        isPlayerResponse
+      );
+    }
+    return;
+  }
+  if (!isObject(node)) return;
+
+  if (shouldBlockAds && (node === root || isPlayerResponse)) {
+    for (const key of adFields) {
+      if (key in node) {
+        delete node[key];
+        console.info(`[adblock] Removed ${key}`);
+      }
+    }
+  }
+
+  if (shouldBlockAds) {
+    for (const key of ['contents', 'items', 'entries']) {
+      if (Array.isArray(node[key])) {
+        node[key] = node[key].filter((item) => !isAdEntry(item));
+      }
+    }
+
+    for (const key of removablePlayerOverlayRenderers) {
+      if (key in node) {
+        delete node[key];
+        console.info(`[adblock] Removed player overlay ${key}`);
+      }
+    }
+  }
+
+  if (shouldUpgradeThumbnails && Array.isArray(node.thumbnails)) {
+    for (const thumbnail of node.thumbnails) {
+      if (typeof thumbnail?.url === 'string') {
+        thumbnail.url = rewriteThumbnailUrl(thumbnail.url);
+      }
+    }
+  }
+
+  for (const key of Object.keys(node)) {
+    const shouldVisit = shouldBlockAds
+      ? isPlayerResponse
+        ? playerOverlayTraversalKeys.has(key)
+        : shouldUpgradeThumbnails
+          ? thumbnailTraversalKeys.has(key)
+          : traversalKeys.has(key)
+      : thumbnailTraversalKeys.has(key);
+    if (shouldVisit) {
+      visitContent(
+        node[key],
+        root,
+        shouldBlockAds,
+        shouldUpgradeThumbnails,
+        key === 'playerResponse'
+      );
+    }
+  }
+}
+
+function rewriteThumbnailUrl(url) {
+  return url.replace(
+    /^(https?:\/\/[^/]+\/)vi(?:_webp)?(\/[^/]+\/)(?:default|mqdefault|hqdefault)\.(?:jpg|webp)([?#].*)?$/,
+    '$1vi$2sddefault.jpg$3'
+  );
+}
+
+function isAdEntry(entry) {
+  if (!isObject(entry)) return false;
+
+  for (const renderer of removableAdRenderers) {
+    if (renderer in entry) return true;
+  }
+
+  return Boolean(
+    entry.videoRenderer?.isAd ||
+      entry.richItemRenderer?.content?.videoRenderer?.isAd ||
+      entry.tileRenderer?.onSelectCommand?.reelWatchEndpoint?.adClientParams
+        ?.isAd ||
+      entry.command?.reelWatchEndpoint?.adClientParams?.isAd
+  );
 }
