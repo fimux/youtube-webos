@@ -4,6 +4,7 @@ declare global {
   interface Window {
     launchParams?: webOSLaunchParams;
     __ytaf_debug__?: boolean;
+    ytaf_jumpToHighlight?: (() => boolean) | null;
   }
 
   interface Document {
