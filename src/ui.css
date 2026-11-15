@@ -122,3 +122,138 @@
   font-size: 1rem;
   color: rgba(255, 255, 255, 0.8);
 }
+
+
+/* Advanced SponsorBlock settings and on-screen segment list */
+.ytaf-ui-container {
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.ytaf-sponsor-settings {
+  margin: 1.25rem 0;
+  padding: 0.75rem;
+  border: 1px solid rgba(255,255,255,.16);
+  border-radius: 10px;
+}
+.ytaf-sponsor-settings h2 {
+  font-size: 1.05rem;
+  margin: .5rem 0;
+}
+.ytaf-sponsor-settings p {
+  font-size: .8rem;
+  opacity: .75;
+}
+.ytaf-sponsor-setting-row {
+  display: flex;
+  align-items: center;
+  gap: .55rem;
+  flex-wrap: wrap;
+  padding: .35rem 0;
+  border-bottom: 1px solid rgba(255,255,255,.1);
+  font-size: .85rem;
+}
+.ytaf-sponsor-setting-row strong {
+  min-width: 12rem;
+}
+.ytaf-sponsor-option {
+  display: inline-flex !important;
+  align-items: center;
+  gap: .2rem;
+  font-size: .75rem !important;
+}
+.ytaf-sponsor-option input {
+  width: 1rem !important;
+  height: 1rem !important;
+}
+.ytaf-sponsor-color,
+.ytaf-shortcut-setting select {
+  color: white;
+  background: #292929;
+  border: 1px solid #777;
+  border-radius: 4px;
+  font-size: .75rem;
+  padding: .25rem;
+}
+.ytaf-shortcut-setting {
+  display: inline-flex !important;
+  align-items: center;
+  gap: .5rem;
+  margin: .25rem .5rem .25rem 0;
+  font-size: .85rem !important;
+}
+.ytaf-sponsor-settings select:focus,
+.ytaf-sponsor-settings input:focus {
+  outline: 3px solid #58a6ff;
+}
+.ytaf-sponsorblock-list {
+  position: fixed;
+  z-index: 1100;
+  right: 2%;
+  top: 18%;
+  width: min(35rem, 42vw);
+  max-height: 65vh;
+  overflow: auto;
+  padding: .8rem;
+  color: #fff;
+  background: rgba(15,15,15,.94);
+  border: 1px solid rgba(255,255,255,.22);
+  border-radius: .65rem;
+  font-size: 1rem;
+  box-shadow: 0 8px 30px rgba(0,0,0,.5);
+}
+.ytaf-sponsorblock-list.empty {
+  display: none;
+}
+.ytaf-sponsorblock-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 700;
+  padding-bottom: .5rem;
+  border-bottom: 1px solid rgba(255,255,255,.2);
+}
+.ytaf-sponsorblock-heading button {
+  color: white;
+  background: #333;
+  border: 1px solid #777;
+  border-radius: .3rem;
+  min-width: 2.4rem;
+  min-height: 2.4rem;
+  font-size: 1.4rem;
+}
+.ytaf-sponsorblock-list.collapsed .ytaf-sponsorblock-row {
+  display: none;
+}
+.ytaf-sponsorblock-row {
+  display: flex;
+  align-items: center;
+  gap: .55rem;
+  min-height: 2.5rem;
+  padding: .3rem 0;
+  border-bottom: 1px solid rgba(255,255,255,.09);
+}
+.ytaf-sponsorblock-swatch {
+  flex: 0 0 .7rem;
+  width: .7rem;
+  height: .7rem;
+  border-radius: 50%;
+}
+.ytaf-sponsorblock-name {
+  flex: 1 1 auto;
+}
+.ytaf-sponsorblock-time {
+  font-variant-numeric: tabular-nums;
+  opacity: .8;
+  white-space: nowrap;
+}
+.ytaf-sponsorblock-skip {
+  color: white;
+  background: #285b94;
+  border: 1px solid #6596cf;
+  border-radius: .35rem;
+  min-height: 2.1rem;
+  padding: .25rem .7rem;
+}
+.ytaf-sponsorblock-list button:focus {
+  outline: 3px solid #58a6ff;
+}
