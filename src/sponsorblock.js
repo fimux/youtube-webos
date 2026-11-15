@@ -74,7 +74,7 @@ function validSegment(raw) {
   const end = Number(raw.segment[1]);
   if (!Number.isFinite(start) || !Number.isFinite(end) || start < 0 || end < start) return null;
   const isFullVideo = raw.category === 'exclusive_access' && raw.actionType === 'full';
-  if (start === end && raw.category !== HIGHLIGHT && raw.actionType !== 'poi' && !isFullVideo) return null;
+  if (start === end && raw.category !== HIGHLIGHT && raw.actionType !== 'poi' && raw.actionType !== 'chapter' && !isFullVideo) return null;
   return {
     category: raw.category,
     segment: [start, end],
