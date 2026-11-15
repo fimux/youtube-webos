@@ -296,8 +296,8 @@ class SponsorBlockHandler {
       const marker = document.createElement('div');
       marker.className = 'ytaf-sponsorblock-segment';
       marker.style.backgroundColor = opts.color;
-      marker.style.left = `${(start / this.video.duration) * 100}%`;
-      marker.style.width = `${Math.max(0.25, ((end - start) / this.video.duration) * 100)}%`;
+      marker.style.left = segment.actionType === 'full' ? '0%' : `${(start / this.video.duration) * 100}%`;
+      marker.style.width = segment.actionType === 'full' ? '100%' : `${Math.max(0.25, ((end - start) / this.video.duration) * 100)}%`;
       this.overlay.appendChild(marker);
     });
   }
@@ -345,11 +345,13 @@ class SponsorBlockHandler {
       row.appendChild(swatch);
       row.appendChild(name);
       row.appendChild(time);
-      if (opts.manualSkip && segment.actionType === 'skip' || opts.manualSkip && segment.category === HIGHLIGHT || segment.actionType === 'chapter') {
+      if (opts.manualSkip && (segment.actionType === 'skip' || segment.category === HIGHLIGHT || segment.actionType === 'chapter')) {
         const button = document.createElement('button');
         button.type = 'button';
         button.className = 'ytaf-sponsorblock-skip';
-        button.textContent = segment.category === HIGHLIGHT ? 'Highlight' : segment.actionType === 'chapter' ? 'Ir' : 'Saltar';
+        const alreadySkipped = configRead('skipSegmentsOnce') && this.skipped.has(segment.UUID);
+        button.disabled = alreadySkipped;
+        button.textContent = alreadySkipped ? 'Saltado' : segment.category === HIGHLIGHT ? 'Highlight' : segment.actionType === 'chapter' ? 'Ir' : 'Saltar';
         button.addEventListener('click', () => {
           if (segment.category === HIGHLIGHT) this.skipSegment(segment, false);
           else if (segment.actionType === 'chapter' && this.video) this.video.currentTime = segment.segment[0];
@@ -373,7 +375,8 @@ class SponsorBlockHandler {
     const segment = this.segments.find((item) => {
       const options = categoryOptions(item.category);
       return item.actionType === 'skip' && item.category !== HIGHLIGHT &&
-        !options.disabled && options.manualSkip && item.segment[1] > this.video.currentTime + 0.1;
+        !options.disabled && options.manualSkip && item.segment[1] > this.video.currentTime + 0.1 &&
+        (!configRead('skipSegmentsOnce') || !this.skipped.has(item.UUID));
     });
     if (!segment) {
       showNotification('No hay segmentos manuales disponibles', 1800);
