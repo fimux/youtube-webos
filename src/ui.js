@@ -112,9 +112,10 @@ function createAdvancedSponsorControls() {
       labelEl.className = 'ytaf-sponsor-option';
       const input = document.createElement('input');
       input.type = 'checkbox';
+      input.disabled = key === 'autoSkip' && ['poi_highlight', 'chapter'].includes(category);
       input.checked = key === 'disabled' ? !!stored.disabled :
         (stored[key] !== undefined ? !!stored[key] :
-          (key === 'autoSkip' ? !['poi_highlight', 'filler', 'hook'].includes(category) : true));
+          (key === 'autoSkip' ? !['poi_highlight', 'filler', 'hook', 'chapter'].includes(category) : true));
       input.addEventListener('change', () => updateSegmentOption(category, { [key]: input.checked }));
       labelEl.appendChild(input);
       labelEl.appendChild(document.createTextNode(text));
