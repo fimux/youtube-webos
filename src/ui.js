@@ -4,7 +4,8 @@ import {
   configAddChangeListener,
   configRead,
   configWrite,
-  configGetDesc
+  configGetDesc,
+  sponsorBlockCategories
 } from './config.js';
 import './ui.css';
 import { requireElement } from './player_api/helpers';
@@ -27,6 +28,12 @@ const colorCodeMap = new Map([
   [167, 'blue'],
   [191, 'blue']
 ]);
+
+let sponsorBlockSegments = [];
+let skipSponsorBlockSegment = () => {};
+let sponsorBlockSegmentList = null;
+let manualSegmentButton = null;
+let notificationContainer = null;
 
 /**
  * Returns the name of the color button associated with a code or null if not a color button.
@@ -65,6 +72,173 @@ function createConfigCheckbox(key) {
   return elmLabel;
 }
 
+function createSponsorBlockSettings() {
+  const section = document.createElement('section');
+  section.className = 'ytaf-sponsorblock-settings';
+
+  const heading = document.createElement('h2');
+  heading.textContent = 'SponsorBlock segment settings';
+  section.appendChild(heading);
+  section.appendChild(createConfigCheckbox('sponsorBlockSkipSegmentsOnce'));
+
+  for (const category of sponsorBlockCategories) {
+    const prefix = `sponsorBlock_${category.id}`;
+    const row = document.createElement('div');
+    row.className = 'ytaf-sponsorblock-category';
+
+    const name = document.createElement('span');
+    name.textContent = category.name;
+    row.appendChild(name);
+
+    const mode = document.createElement('select');
+    mode.setAttribute('aria-label', `${category.name} behavior`);
+    for (const [value, label] of [
+      ['auto', 'Auto skip'],
+      ['manual', 'Manual skip'],
+      ['disabled', 'Disabled']
+    ]) {
+      const option = document.createElement('option');
+      option.value = value;
+      option.textContent = label;
+      mode.appendChild(option);
+    }
+    const modeKey = `${prefix}_mode`;
+    mode.value = configRead(modeKey);
+    mode.addEventListener('change', () => configWrite(modeKey, mode.value));
+    configAddChangeListener(modeKey, (event) => {
+      mode.value = event.detail.newValue;
+    });
+    row.appendChild(mode);
+
+    const color = document.createElement('input');
+    color.type = 'color';
+    color.value = configRead(`${prefix}_color`);
+    color.setAttribute('aria-label', `${category.name} color`);
+    color.title = 'Segment color';
+    color.addEventListener('input', () =>
+      configWrite(`${prefix}_color`, color.value)
+    );
+    configAddChangeListener(`${prefix}_color`, (event) => {
+      color.value = event.detail.newValue;
+    });
+    row.appendChild(color);
+
+    const showLabel = document.createElement('label');
+    showLabel.className = 'ytaf-sponsorblock-show';
+    const showText = document.createElement('span');
+    showText.textContent = 'Bar';
+    showLabel.appendChild(showText);
+
+    const show = document.createElement('input');
+    show.type = 'checkbox';
+    const showKey = `${prefix}_show`;
+    show.checked = configRead(showKey);
+    show.setAttribute('aria-label', `Show ${category.name} in progress bar`);
+    show.title = `Show ${category.name} in progress bar`;
+    show.addEventListener('change', () =>
+      configWrite(showKey, show.checked)
+    );
+    configAddChangeListener(showKey, (event) => {
+      show.checked = event.detail.newValue;
+    });
+    showLabel.appendChild(show);
+    row.appendChild(showLabel);
+    section.appendChild(row);
+  }
+
+  const listHeading = document.createElement('h2');
+  listHeading.textContent = 'Segments in this video';
+  section.appendChild(listHeading);
+
+  sponsorBlockSegmentList = document.createElement('div');
+  sponsorBlockSegmentList.className = 'ytaf-sponsorblock-segment-list';
+  section.appendChild(sponsorBlockSegmentList);
+  renderSponsorBlockSegments();
+  return section;
+}
+
+function formatSegmentTime(seconds) {
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = Math.floor(seconds % 60);
+  return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+}
+
+function renderSponsorBlockSegments() {
+  if (!sponsorBlockSegmentList) return;
+  while (sponsorBlockSegmentList.firstChild) {
+    sponsorBlockSegmentList.removeChild(sponsorBlockSegmentList.firstChild);
+  }
+
+  if (!sponsorBlockSegments.length) {
+    const empty = document.createElement('p');
+    empty.textContent = 'No segments found for this video.';
+    sponsorBlockSegmentList.appendChild(empty);
+    return;
+  }
+
+  for (const segment of sponsorBlockSegments) {
+    const row = document.createElement('div');
+    row.className = 'ytaf-sponsorblock-segment-row';
+    const categoryId =
+      segment.actionType === 'mute' ? 'mute' : segment.category;
+    const category = sponsorBlockCategories.find(
+      (item) => item.id === categoryId
+    );
+    const color = document.createElement('span');
+    color.className = 'ytaf-sponsorblock-list-color';
+    color.style.backgroundColor = category
+      ? configRead(`sponsorBlock_${categoryId}_color`)
+      : '#008fd6';
+    row.appendChild(color);
+
+    const title = document.createElement('span');
+    const mutePrefix = segment.actionType === 'mute' ? 'Muted · ' : '';
+    title.textContent = `${mutePrefix}${segment.category} · ${formatSegmentTime(
+      segment.segment[0]
+    )}–${formatSegmentTime(segment.segment[1])}`;
+    row.appendChild(title);
+
+    const skip = document.createElement('button');
+    skip.type = 'button';
+    skip.textContent =
+      segment.actionType === 'mute'
+        ? 'Mute'
+        : segment.actionType === 'poi' ||
+            segment.category === 'poi_highlight' ||
+            segment.category === 'highlight'
+          ? 'Jump to Highlight'
+          : 'Skip now';
+    skip.addEventListener('click', () => skipSponsorBlockSegment(segment));
+    row.appendChild(skip);
+    sponsorBlockSegmentList.appendChild(row);
+  }
+}
+
+export function setSponsorBlockSegments(segments, skipSegment) {
+  sponsorBlockSegments = segments;
+  skipSponsorBlockSegment = skipSegment;
+  renderSponsorBlockSegments();
+}
+
+export function showManualSegmentSkip(label, onSkip) {
+  if (!manualSegmentButton) {
+    manualSegmentButton = document.createElement('button');
+    manualSegmentButton.type = 'button';
+    manualSegmentButton.className = 'ytaf-sponsorblock-manual-skip';
+    document.body.appendChild(manualSegmentButton);
+  }
+  manualSegmentButton.textContent = label;
+  manualSegmentButton.onclick = onSkip;
+  manualSegmentButton.style.display = 'block';
+}
+
+export function clearManualSegmentSkip() {
+  if (manualSegmentButton) {
+    manualSegmentButton.style.display = 'none';
+    manualSegmentButton.onclick = null;
+  }
+}
+
 function createOptionsPanel() {
   const elmContainer = document.createElement('div');
 
@@ -88,7 +262,10 @@ function createOptionsPanel() {
     (evt) => {
       console.debug('Options panel key event:', evt.type, evt.charCode);
 
-      if (getKeyColor(evt.charCode) === 'green') {
+      if (
+        getKeyColor(evt.charCode) === 'green' ||
+        getKeyColor(evt.keyCode) === 'green'
+      ) {
         return;
       }
 
@@ -124,6 +301,7 @@ function createOptionsPanel() {
 
   elmContainer.appendChild(createConfigCheckbox('enableAdBlock'));
   elmContainer.appendChild(createConfigCheckbox('upgradeThumbnails'));
+  elmContainer.appendChild(createConfigCheckbox('fastThumbnailUpgrade'));
   elmContainer.appendChild(createConfigCheckbox('hideLogo'));
   elmContainer.appendChild(createConfigCheckbox('showWatch'));
   elmContainer.appendChild(createConfigCheckbox('removeShorts'));
@@ -132,17 +310,7 @@ function createOptionsPanel() {
   elmContainer.appendChild(createConfigCheckbox('autoAccountSelect'));
   elmContainer.appendChild(createConfigCheckbox('enableSponsorBlock'));
 
-  const elmBlock = document.createElement('blockquote');
-
-  elmBlock.appendChild(createConfigCheckbox('enableSponsorBlockSponsor'));
-  elmBlock.appendChild(createConfigCheckbox('enableSponsorBlockIntro'));
-  elmBlock.appendChild(createConfigCheckbox('enableSponsorBlockOutro'));
-  elmBlock.appendChild(createConfigCheckbox('enableSponsorBlockInteraction'));
-  elmBlock.appendChild(createConfigCheckbox('enableSponsorBlockSelfPromo'));
-  elmBlock.appendChild(createConfigCheckbox('enableSponsorBlockMusicOfftopic'));
-  elmBlock.appendChild(createConfigCheckbox('enableSponsorBlockPreview'));
-
-  elmContainer.appendChild(elmBlock);
+  elmContainer.appendChild(createSponsorBlockSettings());
 
   const elmSponsorLink = document.createElement('small');
   elmSponsorLink.className = 'ytaf-ui-sponsor';
@@ -187,31 +355,28 @@ function showOptionsPanel(visible) {
 window.ytaf_showOptionsPanel = showOptionsPanel;
 
 const eventHandler = (evt) => {
-  console.debug(
-    'Key event:',
-    evt.type,
-    evt.charCode,
-    evt.keyCode,
-    evt.defaultPrevented
-  );
+  console.debug('Key event:', evt.charCode, evt.keyCode, evt.defaultPrevented);
 
-  if (getKeyColor(evt.charCode) === 'green') {
+  if (
+    getKeyColor(evt.charCode) === 'green' ||
+    getKeyColor(evt.keyCode) === 'green'
+  ) {
     console.debug('Taking over!');
 
     evt.preventDefault();
     evt.stopPropagation();
 
-    if (evt.type === 'keydown') {
-      // Toggle visibility.
-      showOptionsPanel(!optionsPanelVisible);
-    }
+    showOptionsPanel(!optionsPanelVisible);
     return false;
-  } else if (getKeyColor(evt.charCode) === 'blue') {
+  } else if (
+    getKeyColor(evt.charCode) === 'blue' ||
+    getKeyColor(evt.keyCode) === 'blue'
+  ) {
     evt.preventDefault();
     evt.stopPropagation();
 
-    if (evt.type === 'keydown') {
-      // Toggle Audio-Only mode.
+    // Jump to the next Highlight when one exists; otherwise toggle Audio-Only.
+    if (!window.ytaf_jumpToHighlight?.()) {
       initAudioOnlyToggle();
     }
     return false;
@@ -220,8 +385,6 @@ const eventHandler = (evt) => {
 };
 
 document.addEventListener('keydown', eventHandler, true);
-document.addEventListener('keypress', eventHandler, true);
-document.addEventListener('keyup', eventHandler, true);
 
 const COLOR_MAP = {
   red: 'rgba(255, 0, 0, 0.9)',
@@ -233,11 +396,16 @@ const COLOR_MAP = {
 };
 
 export function showNotification(text, time = 3000, color = 'grey') {
-  if (!document.querySelector('.ytaf-notification-container')) {
+  if (!notificationContainer?.isConnected) {
+    notificationContainer = document.querySelector(
+      '.ytaf-notification-container'
+    );
+  }
+  if (!notificationContainer) {
     console.debug('Adding notification container');
-    const c = document.createElement('div');
-    c.classList.add('ytaf-notification-container');
-    document.body.appendChild(c);
+    notificationContainer = document.createElement('div');
+    notificationContainer.classList.add('ytaf-notification-container');
+    document.body.appendChild(notificationContainer);
   }
 
   const elm = document.createElement('div');
@@ -246,7 +414,7 @@ export function showNotification(text, time = 3000, color = 'grey') {
   elmInner.classList.add('message');
   elmInner.classList.add('message-hidden');
   elm.appendChild(elmInner);
-  document.querySelector('.ytaf-notification-container').appendChild(elm);
+  notificationContainer.appendChild(elm);
   elmInner.style.borderColor = COLOR_MAP[color] || color;
 
   setTimeout(() => {
