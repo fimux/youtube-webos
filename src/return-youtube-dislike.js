@@ -93,7 +93,9 @@ function syncRoute() {
 configAddChangeListener('enableReturnYouTubeDislike', () => {
   if (configRead('enableReturnYouTubeDislike')) syncRoute();
   else {
+    currentVideoID = null;
     currentCount = null;
+    requestToken += 1;
     render();
   }
 });
