@@ -337,7 +337,7 @@ class SponsorBlockHandler {
     heading.appendChild(close);
     this.panel.appendChild(heading);
 
-    this.segments.forEach((segment, index) => {
+    this.segments.forEach((segment) => {
       const opts = categoryOptions(segment.category);
       if (opts.disabled) return;
       const row = document.createElement('div');
@@ -406,7 +406,7 @@ class SponsorBlockHandler {
     const now = this.video.currentTime + 0.5;
     const found = this.segments.find((segment) => {
       const opts = categoryOptions(segment.category);
-      return segment.category === HIGHLIGHT && !opts.disabled && segment.segment[0] >= now;
+      return segment.category === HIGHLIGHT && !opts.disabled && opts.manualSkip && segment.segment[0] >= now;
     });
     if (!found) {
       showNotification('No hay más Highlights en este video', 1800);
