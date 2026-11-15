@@ -1,9 +1,22 @@
-import { configRead } from './config';
+import { configAddChangeListener, configRead } from './config';
 import { getPlayerManager, PlayerMode } from './player_api';
 import type { EventMapOf, PlayerManager, VideoID } from './player_api';
 import { showNotification } from './ui';
 
 const playerManager = await getPlayerManager();
+let activeQualityPoll: {
+  intervalToken: number;
+  timeoutToken: number | undefined;
+} | null = null;
+
+function clearQualityPoll() {
+  if (!activeQualityPoll) return;
+  clearInterval(activeQualityPoll.intervalToken);
+  if (activeQualityPoll.timeoutToken !== undefined) {
+    clearTimeout(activeQualityPoll.timeoutToken);
+  }
+  activeQualityPoll = null;
+}
 
 function shouldForce() {
   return configRead('forceHighResVideo');
@@ -25,15 +38,17 @@ function notifyPlaybackQuality(this: PlayerManager) {
 
   showNotification(`${selected} selected (Max ${max})`, 3000);
 
-  this.removeEventListener('playbackStart', notifyPlaybackQuality);
+  this.removeEventListener('playbackStart', setPlaybackQuality);
 }
 
 function setPlaybackQuality(this: PlayerManager, _: unknown) {
+  if (!shouldForce()) return;
+
+  this.removeEventListener('playbackStart', setPlaybackQuality);
   if (this.playerMode === PlayerMode.PREVIEW) return;
 
+  clearQualityPoll();
   console.debug('[video-quality] setting playback quality');
-  this.removeEventListener('playbackStart', setPlaybackQuality);
-
   const prevQuality = this.player.getPlaybackQualityLabel();
   this.player.setPlaybackQualityRange('highres', 'highres');
 
@@ -42,30 +57,41 @@ function setPlaybackQuality(this: PlayerManager, _: unknown) {
     return;
   }
 
-  let timeoutToken: number | undefined;
-
   // No reliable event for quality change, so poll for it
-  const intervalToken = window.setInterval(() => {
+  const poll: {
+    intervalToken: number;
+    timeoutToken: number | undefined;
+  } = { intervalToken: 0, timeoutToken: undefined };
+  activeQualityPoll = poll;
+  poll.intervalToken = window.setInterval(() => {
+    if (activeQualityPoll !== poll) return;
     const currQuality = this.player.getPlaybackQualityLabel();
     if (currQuality !== prevQuality) {
       notifyPlaybackQuality.call(this);
-      clearInterval(intervalToken);
-      clearTimeout(timeoutToken);
+      clearQualityPoll();
     }
   }, 100);
 
-  timeoutToken = window.setTimeout(() => {
+  poll.timeoutToken = window.setTimeout(() => {
+    if (activeQualityPoll !== poll) return;
     console.warn('[video-quality] timed out waiting for quality change');
-    clearInterval(intervalToken);
+    clearQualityPoll();
     notifyPlaybackQuality.call(this);
   }, 3000);
 }
 
 function handleNewVideo(this: PlayerManager, _: EventMap['newVideo']) {
+  clearQualityPoll();
+  this.removeEventListener('playbackStart', setPlaybackQuality);
   if (!shouldForce()) return;
 
-  this.removeEventListener('playbackStart', setPlaybackQuality);
   this.addEventListener('playbackStart', setPlaybackQuality);
 }
 
 playerManager.addEventListener('newVideo', handleNewVideo);
+configAddChangeListener('forceHighResVideo', (event) => {
+  if (event instanceof CustomEvent && !event.detail.newValue) {
+    clearQualityPoll();
+    playerManager.removeEventListener('playbackStart', setPlaybackQuality);
+  }
+});
