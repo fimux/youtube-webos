@@ -75,7 +75,7 @@ const SEGMENT_TYPES = [
 ];
 const SEGMENT_COLORS = [
   '#00d400', '#00ffff', '#0202ed', '#cc00ff', '#ffff00', '#ff9900',
-  '#008fd6', '#ff1684', '#7300ff', '#395699', '#ff4040', '#ffffff'
+  '#008fd6', '#ff1684', '#7300ff', '#395699', '#a66bff', '#aaaaaa', '#ff4040', '#ffffff'
 ];
 const SHORTCUT_ACTIONS = [
   ['none', 'Sin acción'], ['seekBack10', 'Retroceder 10 s'],
