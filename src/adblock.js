@@ -50,10 +50,6 @@ const HOME_SECTION_PATH = [
   'tvSurfaceContentRenderer', 'content', 'sectionListRenderer'
 ];
 
-function hasOwn(object, key) {
-  return object != null && Object.prototype.hasOwnProperty.call(object, key);
-}
-
 function atPath(root, path) {
   let current = root;
   for (const key of path) {
