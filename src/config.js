@@ -1,5 +1,33 @@
 const CONFIG_KEY = 'ytaf-configuration';
 
+const sponsorBlockOptions = {
+  sponsor: { autoSkip: true, manualSkip: true, showInProgress: true, disabled: false, color: '#00d400' },
+  intro: { autoSkip: true, manualSkip: true, showInProgress: true, disabled: false, color: '#00ffff' },
+  outro: { autoSkip: true, manualSkip: true, showInProgress: true, disabled: false, color: '#0202ed' },
+  interaction: { autoSkip: true, manualSkip: true, showInProgress: true, disabled: false, color: '#cc00ff' },
+  selfpromo: { autoSkip: true, manualSkip: true, showInProgress: true, disabled: false, color: '#ffff00' },
+  music_offtopic: { autoSkip: true, manualSkip: true, showInProgress: true, disabled: false, color: '#ff9900' },
+  preview: { autoSkip: false, manualSkip: true, showInProgress: true, disabled: false, color: '#008fd6' },
+  poi_highlight: { autoSkip: false, manualSkip: true, showInProgress: true, disabled: false, color: '#ff1684' },
+  filler: { autoSkip: false, manualSkip: true, showInProgress: true, disabled: false, color: '#7300ff' },
+  hook: { autoSkip: false, manualSkip: true, showInProgress: true, disabled: false, color: '#395699' },
+  exclusive_access: { autoSkip: false, manualSkip: false, showInProgress: true, disabled: false, color: '#a66bff' },
+  chapter: { autoSkip: false, manualSkip: true, showInProgress: true, disabled: false, color: '#aaaaaa' }
+};
+
+const numberKeyActions = {
+  0: 'none',
+  1: 'none',
+  2: 'none',
+  3: 'none',
+  4: 'none',
+  5: 'none',
+  6: 'none',
+  7: 'none',
+  8: 'none',
+  9: 'none'
+};
+
 const configOptions = new Map([
   ['enableAdBlock', { default: true, desc: 'Enable ad blocking' }],
   ['upgradeThumbnails', { default: false, desc: 'Upgrade thumbnail quality' }],
@@ -10,38 +38,27 @@ const configOptions = new Map([
   ['enableSponsorBlock', { default: true, desc: 'Enable SponsorBlock' }],
   [
     'enableSponsorBlockSponsor',
-    { default: true, desc: 'Skip sponsor segments' }
+    { default: true, desc: 'Skip sponsor segments (legacy setting)' }
   ],
-  ['enableSponsorBlockIntro', { default: true, desc: 'Skip intro segments' }],
-  ['enableSponsorBlockOutro', { default: true, desc: 'Skip outro segments' }],
-  [
-    'enableSponsorBlockInteraction',
-    {
-      default: true,
-      desc: 'Skip interaction reminder segments'
-    }
-  ],
-  [
-    'enableSponsorBlockSelfPromo',
-    {
-      default: true,
-      desc: 'Skip self promotion segments'
-    }
-  ],
-  [
-    'enableSponsorBlockMusicOfftopic',
-    {
-      default: true,
-      desc: 'Skip non-music segments in music videos'
-    }
-  ],
-  [
-    'enableSponsorBlockPreview',
-    {
-      default: false,
-      desc: 'Skip recaps and previews'
-    }
-  ],
+  ['enableSponsorBlockIntro', { default: true, desc: 'Skip intro segments (legacy setting)' }],
+  ['enableSponsorBlockOutro', { default: true, desc: 'Skip outro segments (legacy setting)' }],
+  ['enableSponsorBlockInteraction', { default: true, desc: 'Skip interaction reminder segments (legacy setting)' }],
+  ['enableSponsorBlockSelfPromo', { default: true, desc: 'Skip self promotion segments (legacy setting)' }],
+  ['enableSponsorBlockMusicOfftopic', { default: true, desc: 'Skip non-music segments (legacy setting)' }],
+  ['enableSponsorBlockPreview', { default: false, desc: 'Skip recaps and previews (legacy setting)' }],
+  ['enableSponsorBlockHook', { default: false, desc: 'Enable hook/greetings segments' }],
+  ['enableSponsorBlockFiller', { default: false, desc: 'Enable filler/tangents segments' }],
+  ['enableSponsorBlockHighlight', { default: true, desc: 'Enable SponsorBlock highlights' }],
+  ['enableSponsorBlockExclusiveAccess', { default: true, desc: 'Show full-video exclusive access segments' }],
+  ['enableSponsorBlockChapter', { default: true, desc: 'Show SponsorBlock chapter markers' }],
+  ['enableMutedSegments', { default: true, desc: 'Mute SponsorBlock muted segments' }],
+  ['skipSegmentsOnce', { default: false, desc: 'Skip each segment only once per playback session' }],
+  ['sponsorBlockOptions', { default: sponsorBlockOptions, desc: 'Per-category SponsorBlock settings' }],
+  ['blueButtonAction', { default: 'highlight', desc: 'Action for the blue remote button' }],
+  ['numberKeyActions', { default: numberKeyActions, desc: 'Programmable remote number keys' }],
+  ['hideQrOverlays', { default: true, desc: 'Hide QR-code overlays during playback' }],
+  ['hideShopButton', { default: true, desc: 'Hide the Shop button during playback' }],
+  ['enableReturnYouTubeDislike', { default: false, desc: 'Show estimated dislikes in video details' }],
   [
     'hideLogo',
     {
@@ -105,7 +122,45 @@ function loadStoredConfig() {
   }
 
   try {
-    return JSON.parse(storage);
+    const stored = JSON.parse(storage);
+    if (!stored || typeof stored !== 'object' || Array.isArray(stored)) return null;
+
+    const previousOptions = stored.sponsorBlockOptions || {};
+    stored.sponsorBlockOptions = JSON.parse(JSON.stringify(sponsorBlockOptions));
+    for (const category of Object.keys(sponsorBlockOptions)) {
+      stored.sponsorBlockOptions[category] = Object.assign(
+        {},
+        sponsorBlockOptions[category],
+        previousOptions[category] || {}
+      );
+    }
+
+    // Preserve the legacy category toggles when migrating older installations.
+    for (const [category, key] of Object.entries({
+      sponsor: 'enableSponsorBlockSponsor',
+      intro: 'enableSponsorBlockIntro',
+      outro: 'enableSponsorBlockOutro',
+      interaction: 'enableSponsorBlockInteraction',
+      selfpromo: 'enableSponsorBlockSelfPromo',
+      music_offtopic: 'enableSponsorBlockMusicOfftopic',
+      preview: 'enableSponsorBlockPreview',
+      filler: 'enableSponsorBlockFiller',
+      hook: 'enableSponsorBlockHook',
+      exclusive_access: 'enableSponsorBlockExclusiveAccess',
+      chapter: 'enableSponsorBlockChapter'
+    })) {
+      const current = previousOptions[category];
+      if ((!current || current.autoSkip === undefined) && typeof stored[key] === 'boolean') {
+        stored.sponsorBlockOptions[category].autoSkip = stored[key];
+      }
+    }
+
+    stored.numberKeyActions = Object.assign(
+      {},
+      numberKeyActions,
+      stored.numberKeyActions || {}
+    );
+    return stored;
   } catch (err) {
     console.warn('Error parsing stored config:', err);
     return null;

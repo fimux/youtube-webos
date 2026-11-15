@@ -65,6 +65,134 @@ function createConfigCheckbox(key) {
   return elmLabel;
 }
 
+
+const SEGMENT_TYPES = [
+  ['sponsor', 'Patrocinadores'], ['intro', 'Introducciones'],
+  ['outro', 'Final / créditos'], ['interaction', 'Interacciones'],
+  ['selfpromo', 'Autopromoción'], ['music_offtopic', 'Partes no musicales'],
+  ['preview', 'Resumen / avance'], ['poi_highlight', 'Highlight'],
+  ['filler', 'Tangentes'], ['hook', 'Hook / saludos'],
+  ['exclusive_access', 'Acceso exclusivo'], ['chapter', 'Capítulos']
+];
+const SEGMENT_COLORS = [
+  '#00d400', '#00ffff', '#0202ed', '#cc00ff', '#ffff00', '#ff9900',
+  '#008fd6', '#ff1684', '#7300ff', '#395699', '#a66bff', '#aaaaaa', '#ff4040', '#ffffff'
+];
+const SHORTCUT_ACTIONS = [
+  ['none', 'Sin acción'], ['seekBack10', 'Retroceder 10 s'],
+  ['seekForward10', 'Avanzar 10 s'], ['playPause', 'Reproducir / pausar'],
+  ['jumpHighlight', 'Siguiente Highlight'], ['toggleSegmentList', 'Mostrar segmentos'],
+  ['skipNextSegment', 'Saltar siguiente segmento'], ['restartVideo', 'Reiniciar video']
+];
+
+function updateSegmentOption(category, patch) {
+  const all = Object.assign({}, configRead('sponsorBlockOptions') || {});
+  all[category] = Object.assign({}, all[category] || {}, patch);
+  configWrite('sponsorBlockOptions', all);
+}
+
+function createAdvancedSponsorControls() {
+  const section = document.createElement('div');
+  section.className = 'ytaf-sponsor-settings';
+  const heading = document.createElement('h2');
+  heading.textContent = 'SponsorBlock · opciones por categoría';
+  section.appendChild(heading);
+  const description = document.createElement('p');
+  description.textContent = 'Configura omisión automática, manual, marcas de progreso y color para cada tipo.';
+  section.appendChild(description);
+  SEGMENT_TYPES.forEach(([category, label]) => {
+    const stored = (configRead('sponsorBlockOptions') || {})[category] || {};
+    const row = document.createElement('div');
+    row.className = 'ytaf-sponsor-setting-row';
+    const title = document.createElement('strong');
+    title.textContent = label;
+    row.appendChild(title);
+    [['autoSkip', 'Auto'], ['manualSkip', 'Manual'], ['showInProgress', 'Barra'], ['disabled', 'Desactivado']].forEach(([key, text]) => {
+      const labelEl = document.createElement('label');
+      labelEl.className = 'ytaf-sponsor-option';
+      const input = document.createElement('input');
+      input.type = 'checkbox';
+      input.disabled = key === 'autoSkip' && ['poi_highlight', 'chapter'].includes(category);
+      input.checked = key === 'disabled' ? !!stored.disabled :
+        (stored[key] !== undefined ? !!stored[key] :
+          (key === 'autoSkip' ? !['poi_highlight', 'filler', 'hook', 'chapter'].includes(category) : true));
+      input.addEventListener('change', () => updateSegmentOption(category, { [key]: input.checked }));
+      labelEl.appendChild(input);
+      labelEl.appendChild(document.createTextNode(text));
+      row.appendChild(labelEl);
+    });
+    const color = document.createElement('select');
+    color.className = 'ytaf-sponsor-color';
+    color.setAttribute('aria-label', 'Color de ' + label);
+    SEGMENT_COLORS.forEach((value) => {
+      const option = document.createElement('option');
+      option.value = value;
+      option.textContent = value;
+      option.style.backgroundColor = value;
+      color.appendChild(option);
+    });
+    color.value = stored.color || SEGMENT_COLORS[SEGMENT_TYPES.findIndex((v) => v[0] === category)] || '#717171';
+    color.addEventListener('change', () => updateSegmentOption(category, { color: color.value }));
+    row.appendChild(color);
+    section.appendChild(row);
+  });
+  const blueLabel = document.createElement('label');
+  blueLabel.className = 'ytaf-shortcut-setting';
+  blueLabel.appendChild(document.createTextNode('Botón azul '));
+  const blue = document.createElement('select');
+  [['highlight', 'Siguiente Highlight'], ['audio', 'Modo solo audio'], ['segments', 'Mostrar / ocultar segmentos']].forEach(([value, label]) => {
+    const option = document.createElement('option');
+    option.value = value;
+    option.textContent = label;
+    blue.appendChild(option);
+  });
+  blue.value = configRead('blueButtonAction');
+  blue.addEventListener('change', () => configWrite('blueButtonAction', blue.value));
+  blueLabel.appendChild(blue);
+  section.appendChild(blueLabel);
+  const shortcutHeading = document.createElement('h2');
+  shortcutHeading.textContent = 'Atajos numéricos (0–9)';
+  section.appendChild(shortcutHeading);
+  const shortcuts = configRead('numberKeyActions') || {};
+  for (let number = 0; number <= 9; number += 1) {
+    const label = document.createElement('label');
+    label.className = 'ytaf-shortcut-setting';
+    label.appendChild(document.createTextNode(number + ' '));
+    const select = document.createElement('select');
+    select.setAttribute('aria-label', 'Acción de la tecla ' + number);
+    SHORTCUT_ACTIONS.forEach(([value, text]) => {
+      const option = document.createElement('option');
+      option.value = value;
+      option.textContent = text;
+      select.appendChild(option);
+    });
+    select.value = shortcuts[number] || 'none';
+    select.addEventListener('change', () => {
+      const next = Object.assign({}, configRead('numberKeyActions') || {});
+      next[number] = select.value;
+      configWrite('numberKeyActions', next);
+    });
+    label.appendChild(select);
+    section.appendChild(label);
+  }
+  return section;
+}
+
+function runNumberShortcut(action) {
+  const video = document.querySelector('video');
+  if (!video) return;
+  switch (action) {
+    case 'seekBack10': video.currentTime = Math.max(0, video.currentTime - 10); break;
+    case 'seekForward10': video.currentTime = Math.min(video.duration || Infinity, video.currentTime + 10); break;
+    case 'playPause': video.paused ? video.play() : video.pause(); break;
+    case 'jumpHighlight': window.ytaf_jumpToNextHighlight && window.ytaf_jumpToNextHighlight(); break;
+    case 'toggleSegmentList': window.ytaf_toggleSponsorBlockList && window.ytaf_toggleSponsorBlockList(); break;
+    case 'skipNextSegment': window.sponsorblock && window.sponsorblock.skipNextManual && window.sponsorblock.skipNextManual(); break;
+    case 'restartVideo': video.currentTime = 0; break;
+    default: return;
+  }
+}
+
 function createOptionsPanel() {
   const elmContainer = document.createElement('div');
 
@@ -132,17 +260,12 @@ function createOptionsPanel() {
   elmContainer.appendChild(createConfigCheckbox('autoAccountSelect'));
   elmContainer.appendChild(createConfigCheckbox('enableSponsorBlock'));
 
-  const elmBlock = document.createElement('blockquote');
-
-  elmBlock.appendChild(createConfigCheckbox('enableSponsorBlockSponsor'));
-  elmBlock.appendChild(createConfigCheckbox('enableSponsorBlockIntro'));
-  elmBlock.appendChild(createConfigCheckbox('enableSponsorBlockOutro'));
-  elmBlock.appendChild(createConfigCheckbox('enableSponsorBlockInteraction'));
-  elmBlock.appendChild(createConfigCheckbox('enableSponsorBlockSelfPromo'));
-  elmBlock.appendChild(createConfigCheckbox('enableSponsorBlockMusicOfftopic'));
-  elmBlock.appendChild(createConfigCheckbox('enableSponsorBlockPreview'));
-
-  elmContainer.appendChild(elmBlock);
+  elmContainer.appendChild(createConfigCheckbox('enableMutedSegments'));
+  elmContainer.appendChild(createConfigCheckbox('skipSegmentsOnce'));
+  elmContainer.appendChild(createConfigCheckbox('hideQrOverlays'));
+  elmContainer.appendChild(createConfigCheckbox('hideShopButton'));
+  elmContainer.appendChild(createConfigCheckbox('enableReturnYouTubeDislike'));
+  elmContainer.appendChild(createAdvancedSponsorControls());
 
   const elmSponsorLink = document.createElement('small');
   elmSponsorLink.className = 'ytaf-ui-sponsor';
@@ -195,6 +318,21 @@ const eventHandler = (evt) => {
     evt.defaultPrevented
   );
 
+  if (evt.type === 'keydown' && /^[0-9]$/.test(evt.key || '') &&
+      !optionsPanelVisible &&
+      !(document.activeElement instanceof HTMLInputElement) &&
+      !(document.activeElement instanceof HTMLSelectElement) &&
+      !(document.activeElement instanceof HTMLTextAreaElement)) {
+    const shortcuts = configRead('numberKeyActions') || {};
+    const action = shortcuts[evt.key] || 'none';
+    if (action !== 'none') {
+      evt.preventDefault();
+      evt.stopPropagation();
+      runNumberShortcut(action);
+      return false;
+    }
+  }
+
   if (getKeyColor(evt.charCode) === 'green') {
     console.debug('Taking over!');
 
@@ -211,8 +349,10 @@ const eventHandler = (evt) => {
     evt.stopPropagation();
 
     if (evt.type === 'keydown') {
-      // Toggle Audio-Only mode.
-      initAudioOnlyToggle();
+      const action = configRead('blueButtonAction');
+      if (action === 'audio') initAudioOnlyToggle();
+      else if (action === 'segments') window.ytaf_toggleSponsorBlockList && window.ytaf_toggleSponsorBlockList();
+      else window.ytaf_jumpToNextHighlight && window.ytaf_jumpToNextHighlight();
     }
     return false;
   }

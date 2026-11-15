@@ -17,6 +17,7 @@ import './adblock.js';
 import './hooks/json-stringify';
 import './shorts.js';
 import './sponsorblock.js';
+import './return-youtube-dislike.js';
 import './ui.js';
 import './font-fix.css';
 import './thumbnail-quality';

@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased]
+
+### Added
+
+- Advanced SponsorBlock category controls, including Highlight, hooks, tangents, muted segments, chapter and exclusive-access markers.
+- On-screen SponsorBlock segment list, configurable colors, manual/automatic controls and Skip Segments Once.
+- Programmable LG remote number keys, configurable blue-button action, QR/Shop overlay filters and optional Return YouTube Dislike estimate.
+- Bounded schema-based ad renderer filtering and guarded Shorts response traversal.
+
 ## [0.5.3] - 2026/04/18
 
 ### Fixed
