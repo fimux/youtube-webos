@@ -7,30 +7,55 @@ const SHELF_SHORTS = 'TVHTML5_SHELF_RENDERER_TYPE_SHORTS';
 const origParse = JSON.parse;
 JSON.parse = function () {
   const r = origParse.apply(this, arguments);
+  if (!hasShortsSchema(r)) {
+    return r;
+  }
   if (!configRead('removeShorts')) {
     return r;
   }
 
-  // First page of subscriptions tab
-  const gridRenderer = findFirstObject(r, 'gridRenderer');
-  if (gridRenderer?.items) {
-    removeShorts(gridRenderer);
+  const tabs = r?.contents?.twoColumnBrowseResultsRenderer?.tabs;
+  const subscriptionTabs = Array.isArray(tabs) ? tabs : [];
+  for (const tab of subscriptionTabs) {
+    const browseId =
+      tab?.tabRenderer?.endpoint?.browseEndpoint?.browseId;
+    if (browseId !== 'FEsubscriptions') continue;
+
+    const content = tab.tabRenderer.content;
+    const renderers = findFirstRenderers(content);
+    const gridRenderer = renderers.gridRenderer;
+    if (gridRenderer?.items) {
+      removeShorts(gridRenderer);
+    }
+
+    const sectionListRenderer = renderers.sectionListRenderer;
+    if (sectionListRenderer?.contents) {
+      removeShelvesWithShorts(sectionListRenderer);
+    }
   }
 
-  // Pagination
-  const gridContinuation = findFirstObject(r, 'gridContinuation');
-  if (gridContinuation?.items) {
+  const gridContinuation = r?.continuationContents?.gridContinuation;
+  if (gridContinuation?.items && isSubscriptionsRoute()) {
     removeShorts(gridContinuation);
-  }
-
-  // Shelf on subscriptions tab
-  const sectionListRenderer = findFirstObject(r, 'sectionListRenderer');
-  if (sectionListRenderer?.contents) {
-    removeShelvesWithShorts(sectionListRenderer);
   }
 
   return r;
 };
+
+function hasShortsSchema(response) {
+  return Boolean(
+    response?.contents?.twoColumnBrowseResultsRenderer?.tabs ||
+      response?.continuationContents?.gridContinuation
+  );
+}
+
+function isSubscriptionsRoute() {
+  const route = new URL(location.hash.substring(1), location.href);
+  return (
+    route.pathname === '/feed/subscriptions' ||
+    route.pathname.startsWith('/browse/FEsubscriptions')
+  );
+}
 
 function removeShorts(container) {
   container.items = container.items.filter(
@@ -44,15 +69,27 @@ function removeShelvesWithShorts(container) {
   );
 }
 
-function findFirstObject(haystack, needle) {
-  for (const key in haystack) {
-    if (key === needle) {
-      return haystack[key];
+function findFirstRenderers(root) {
+  const result = { gridRenderer: null, sectionListRenderer: null };
+  const stack = [root];
+
+  while (stack.length && (!result.gridRenderer || !result.sectionListRenderer)) {
+    const node = stack.pop();
+    if (node === null || typeof node !== 'object') continue;
+
+    if (Array.isArray(node)) {
+      stack.push(...node);
+      continue;
     }
-    if (typeof haystack[key] === 'object') {
-      const result = findFirstObject(haystack[key], needle);
-      if (result) return result;
+
+    if (!result.gridRenderer && node.gridRenderer) {
+      result.gridRenderer = node.gridRenderer;
     }
+    if (!result.sectionListRenderer && node.sectionListRenderer) {
+      result.sectionListRenderer = node.sectionListRenderer;
+    }
+    stack.push(...Object.values(node));
   }
-  return null;
+
+  return result;
 }
