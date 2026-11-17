@@ -1,0 +1,13 @@
+{
+  "id": "youtube.leanback.v4",
+  "version": "1.0.0",
+  "type": "web",
+  "title": "YouTube AdFree",
+  "iconUri": "https://raw.githubusercontent.com/fimux/youtube-webos/main/assets/largeIcon.png",
+  "sourceUrl": "https://github.com/fimux/youtube-webos",
+  "rootRequired": false,
+  "ipkUrl": "https://github.com/fimux/youtube-webos/releases/download/LG/Youtube_1.0.0.ipk",
+  "ipkHash": {
+    "sha256": "9e186372978076864d6108b9e579d888bfbecd314be440a5af3aa9a0c4119a1c"
+  }
+}
